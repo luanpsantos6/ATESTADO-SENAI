@@ -1,0 +1,243 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Turma, Unidade, User, Matricula } from '@/types/database'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+
+interface Props {
+  turmas: Turma[]
+  unidades: Unidade[]
+  professores: User[]
+  alunos: User[]
+}
+
+export default function AdminTurmas({
+  turmas: initial,
+  unidades,
+  professores,
+  alunos,
+}: Props) {
+  const [turmas, setTurmas] = useState(initial)
+  const [showForm, setShowForm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [editingMatriculas, setEditingMatriculas] = useState<string | null>(null)
+  const [matriculados, setMatriculados] = useState<string[]>([])
+  const [selectedAlunos, setSelectedAlunos] = useState<string[]>([])
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function createTurma(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    const fd = new FormData(e.currentTarget)
+
+    const { error: insertError } = await supabase.from('turmas').insert({
+      nome: fd.get('nome') as string,
+      ano_letivo: Number(fd.get('ano_letivo')),
+      professor_id: (fd.get('professor_id') as string) || null,
+      unidade_id: fd.get('unidade_id') as string,
+    })
+
+    if (insertError) {
+      setError(insertError.message)
+      setLoading(false)
+      return
+    }
+
+    setShowForm(false)
+    setLoading(false)
+    router.refresh()
+  }
+
+  async function deleteTurma(id: string) {
+    if (!confirm('Excluir esta turma?')) return
+    await supabase.from('turmas').delete().eq('id', id)
+    setTurmas((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  async function openMatriculas(turmaId: string) {
+    const { data } = await supabase
+      .from('matriculas')
+      .select('aluno_id')
+      .eq('turma_id', turmaId)
+
+    const ids = data?.map((m) => m.aluno_id) || []
+    setMatriculados(ids)
+    setSelectedAlunos(ids)
+    setEditingMatriculas(turmaId)
+  }
+
+  async function saveMatriculas(turmaId: string) {
+    setLoading(true)
+    await supabase.from('matriculas').delete().eq('turma_id', turmaId)
+
+    if (selectedAlunos.length > 0) {
+      await supabase.from('matriculas').insert(
+        selectedAlunos.map((aluno_id) => ({
+          aluno_id,
+          turma_id: turmaId,
+        }))
+      )
+    }
+
+    setEditingMatriculas(null)
+    setLoading(false)
+    router.refresh()
+  }
+
+  function toggleAluno(id: string) {
+    setSelectedAlunos((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+    )
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setShowForm(!showForm)}
+        className="mb-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
+      >
+        {showForm ? 'Cancelar' : '+ Nova turma'}
+      </button>
+
+      {showForm && (
+        <form onSubmit={createTurma} className="bg-white rounded-xl shadow p-5 mb-6 space-y-3">
+          <input
+            name="nome"
+            placeholder="Nome da turma (ex: 3º Ano A)"
+            required
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+          <input
+            name="ano_letivo"
+            type="number"
+            placeholder="Ano letivo"
+            defaultValue={2026}
+            required
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+          <select name="unidade_id" required className="w-full px-3 py-2 border rounded-lg">
+            <option value="">Selecione a unidade *</option>
+            {unidades.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nome} ({u.cidade})
+              </option>
+            ))}
+          </select>
+          <select name="professor_id" className="w-full px-3 py-2 border rounded-lg">
+            <option value="">Professor responsável (opcional)</option>
+            {professores.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.full_name}
+              </option>
+            ))}
+          </select>
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
+          >
+            {loading ? 'Criando...' : 'Criar turma'}
+          </button>
+        </form>
+      )}
+
+      <div className="bg-white rounded-xl shadow overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="text-left px-4 py-3">Turma</th>
+              <th className="text-left px-4 py-3">Ano</th>
+              <th className="text-left px-4 py-3">Unidade</th>
+              <th className="text-left px-4 py-3">Professor</th>
+              <th className="text-left px-4 py-3">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {turmas.map((t) => (
+              <tr key={t.id} className="border-t">
+                <td className="px-4 py-3 font-medium">{t.nome}</td>
+                <td className="px-4 py-3">{t.ano_letivo}</td>
+                <td className="px-4 py-3">{t.unidade?.nome || '—'}</td>
+                <td className="px-4 py-3">{t.professor?.full_name || '—'}</td>
+                <td className="px-4 py-3 space-x-2">
+                  <button
+                    onClick={() => openMatriculas(t.id)}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Matrículas
+                  </button>
+                  <button
+                    onClick={() => deleteTurma(t.id)}
+                    className="text-xs text-red-600 hover:underline"
+                  >
+                    Excluir
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {turmas.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  Nenhuma turma cadastrada.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {editingMatriculas && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">Matricular Alunos</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Selecione os alunos desta turma:
+            </p>
+            <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
+              {alunos.length === 0 && (
+                <p className="text-sm text-gray-400">Nenhum aluno cadastrado.</p>
+              )}
+              {alunos.map((a) => (
+                <label
+                  key={a.id}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedAlunos.includes(a.id)}
+                    onChange={() => toggleAluno(a.id)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">
+                    {a.full_name}{' '}
+                    <span className="text-gray-400">({a.email})</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => saveMatriculas(editingMatriculas)}
+                disabled={loading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Salvando...' : 'Salvar matrículas'}
+              </button>
+              <button
+                onClick={() => setEditingMatriculas(null)}
+                className="text-sm text-gray-600 px-4 py-2"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
