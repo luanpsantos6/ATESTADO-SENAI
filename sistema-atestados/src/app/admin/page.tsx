@@ -33,7 +33,7 @@ export default async function AdminUsuariosPage() {
           </a>
           <h1 className="text-2xl font-bold">Gerenciar Usuários</h1>
         </div>
-        <AdminUsuarios users={users || []} />
+        <AdminUsuarios users={(users as any) || []} />
       </main>
     </div>
   )

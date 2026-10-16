@@ -54,8 +54,8 @@ export default async function AdminAtestadosPage({
           <h1 className="text-2xl font-bold">Gerenciar Atestados</h1>
         </div>
         <AdminAtestadosList
-          atestados={atestados || []}
-          turmas={turmas || []}
+          atestados={(atestados as any) || []}
+          turmas={(turmas as any) || []}
           currentStatus={status}
           adminId={user.id}
         />

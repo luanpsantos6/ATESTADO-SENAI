@@ -1,12 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Turma, Unidade, User, Matricula } from '@/types/database'
+import { useState } from 'react'
+import { Unidade, User } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+type TurmaRow = {
+  id: string
+  nome: string
+  ano_letivo: number
+  professor_id: string | null
+  unidade_id: string | null
+  created_at?: string
+  professor?: { full_name?: string } | null
+  unidade?: { nome?: string; cidade?: string } | null
+}
+
 interface Props {
-  turmas: Turma[]
+  turmas: TurmaRow[]
   unidades: Unidade[]
   professores: User[]
   alunos: User[]
@@ -23,7 +34,6 @@ export default function AdminTurmas({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingMatriculas, setEditingMatriculas] = useState<string | null>(null)
-  const [matriculados, setMatriculados] = useState<string[]>([])
   const [selectedAlunos, setSelectedAlunos] = useState<string[]>([])
   const router = useRouter()
   const supabase = createClient()
@@ -65,7 +75,6 @@ export default function AdminTurmas({
       .eq('turma_id', turmaId)
 
     const ids = data?.map((m) => m.aluno_id) || []
-    setMatriculados(ids)
     setSelectedAlunos(ids)
     setEditingMatriculas(turmaId)
   }
@@ -195,9 +204,7 @@ export default function AdminTurmas({
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Matricular Alunos</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Selecione os alunos desta turma:
-            </p>
+            <p className="text-sm text-gray-500 mb-4">Selecione os alunos desta turma:</p>
             <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
               {alunos.length === 0 && (
                 <p className="text-sm text-gray-400">Nenhum aluno cadastrado.</p>
@@ -214,8 +221,7 @@ export default function AdminTurmas({
                     className="w-4 h-4"
                   />
                   <span className="text-sm">
-                    {a.full_name}{' '}
-                    <span className="text-gray-400">({a.email})</span>
+                    {a.full_name} <span className="text-gray-400">({a.email})</span>
                   </span>
                 </label>
               ))}

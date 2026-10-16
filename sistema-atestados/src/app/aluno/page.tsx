@@ -31,7 +31,7 @@ export default async function AlunoPage() {
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         <h1 className="text-2xl font-bold">Meus Atestados</h1>
         <EnviarAtestado />
-        <ListaAtestados atestados={atestados || []} />
+        <ListaAtestados atestados={(atestados as any) || []} />
       </main>
     </div>
   )

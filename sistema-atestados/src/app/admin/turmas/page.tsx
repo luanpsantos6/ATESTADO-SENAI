@@ -44,6 +44,13 @@ export default async function AdminTurmasPage() {
     .eq('active', true)
     .order('full_name')
 
+  // Normaliza joins do Supabase (pode vir objeto ou array)
+  const turmasNorm = (turmas || []).map((t: any) => {
+    const professor = Array.isArray(t.professor) ? t.professor[0] : t.professor
+    const unidade = Array.isArray(t.unidade) ? t.unidade[0] : t.unidade
+    return { ...t, professor, unidade }
+  })
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar userName={profile.full_name} role="admin" />
@@ -55,10 +62,10 @@ export default async function AdminTurmasPage() {
           <h1 className="text-2xl font-bold">Turmas e Matrículas</h1>
         </div>
         <AdminTurmas
-          turmas={turmas || []}
-          unidades={unidades || []}
-          professores={professores || []}
-          alunos={alunos || []}
+          turmas={turmasNorm as any}
+          unidades={(unidades as any) || []}
+          professores={(professores as any) || []}
+          alunos={(alunos as any) || []}
         />
       </main>
     </div>
