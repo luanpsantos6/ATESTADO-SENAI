@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Atestado, Turma } from '@/types/database'
+import { Atestado } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
@@ -13,9 +13,15 @@ const statusColors: Record<string, string> = {
   rejeitado: 'bg-red-100 text-red-800',
 }
 
+type TurmaOption = {
+  id: string
+  nome: string
+  ano_letivo: number
+}
+
 interface Props {
   atestados: Atestado[]
-  turmas: Turma[]
+  turmas: TurmaOption[]
   currentStatus: string
   adminId: string
 }
