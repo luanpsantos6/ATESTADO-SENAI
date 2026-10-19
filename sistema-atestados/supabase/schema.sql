@@ -111,18 +111,30 @@ CREATE INDEX idx_professor_unidades_unidade ON public.professor_unidades(unidade
 -- FUNÇÃO: criar perfil automaticamente no signup
 -- =============================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role TEXT := COALESCE(NEW.raw_user_meta_data->>'role', 'aluno');
 BEGIN
+  IF v_role NOT IN ('admin', 'professor', 'aluno') THEN
+    v_role := 'aluno';
+  END IF;
+
   INSERT INTO public.users (id, full_name, email, role)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+    COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), NEW.email),
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'role', 'aluno')
-  );
+    v_role
+  )
+  ON CONFLICT (id) DO NOTHING;
+
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 

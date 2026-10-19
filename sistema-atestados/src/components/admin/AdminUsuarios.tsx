@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { User, Role, Unidade } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { createUserAsAdmin } from '@/app/actions/admin'
 
 export default function AdminUsuarios({ users: initial }: { users: User[] }) {
   const [users, setUsers] = useState(initial)
@@ -32,31 +33,12 @@ export default function AdminUsuarios({ users: initial }: { users: User[] }) {
     setError(null)
     const fd = new FormData(e.currentTarget)
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: fd.get('email') as string,
-      password: fd.get('password') as string,
-      options: {
-        data: {
-          full_name: fd.get('full_name') as string,
-          role: fd.get('role') as string,
-        },
-      },
-    })
+    const result = await createUserAsAdmin(fd)
 
-    if (signUpError) {
-      setError(signUpError.message)
+    if (result?.error) {
+      setError(result.error)
       setLoading(false)
       return
-    }
-
-    if (data.user) {
-      await supabase
-        .from('users')
-        .update({
-          role: fd.get('role') as string,
-          full_name: fd.get('full_name') as string,
-        })
-        .eq('id', data.user.id)
     }
 
     setShowForm(false)

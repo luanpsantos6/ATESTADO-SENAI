@@ -37,6 +37,7 @@ Cuiabá (Sede, Faculdade de Tecnologia, Instituto de Tecnologia), Várzea Grande
 3. Configure as variáveis de ambiente:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (necessária para o admin criar usuários)
 4. Deploy
 
 ## Criar o primeiro Admin
