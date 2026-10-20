@@ -1,94 +1,201 @@
+import Link from 'next/link'
 import Navbar from '@/components/Navbar'
+import ProfessorAtestados, { type AtestadoView } from '@/components/professor/ProfessorAtestados'
 import { requireRole } from '@/lib/auth'
-import { formatDate } from '@/lib/format'
+import { carregarEscopo } from '@/lib/professor'
 
-export default async function ProfessorPage() {
-  const { supabase, user, profile } = await requireRole('professor')
+export default async function ProfessorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ aba?: string; busca?: string }>
+}) {
+  const { profile } = await requireRole('professor')
+  const { aba: abaParam, busca } = await searchParams
+  const aba = abaParam === 'alunos' ? 'alunos' : 'atestados'
 
-  const { data: minhasUnidades } = await supabase
-    .from('professor_unidades')
-    .select('unidade_id, unidade:unidades(nome, cidade)')
-    .eq('professor_id', user.id)
+  let erro: string | null = null
+  let escopo: Awaited<ReturnType<typeof carregarEscopo>> | null = null
+  try {
+    escopo = await carregarEscopo(profile.id)
+  } catch (e) {
+    erro = (e as Error).message
+  }
 
-  const nomesUnidades =
-    minhasUnidades
-      ?.map((pu) => {
-        const u = pu.unidade as { nome?: string } | { nome?: string }[] | null
-        if (!u) return null
-        if (Array.isArray(u)) return u[0]?.nome ?? null
-        return u.nome ?? null
-      })
-      .filter((n): n is string => Boolean(n))
-      .join(', ') || ''
+  const turmas = escopo?.turmas ?? []
+  const alunos = escopo?.alunos ?? []
+  const alunoMap = new Map(alunos.map((a) => [a.id, a]))
+  const turmaMap = new Map(turmas.map((t) => [t.id, t]))
 
-  const { data: atestados } = await supabase
-    .from('atestados')
-    .select(
-      `
-      *,
-      aluno:users!atestados_aluno_id_fkey(full_name, email),
-      faltas:faltas_abonadas(*, turma:turmas(nome, unidade:unidades(nome)))
-    `
-    )
-    .eq('status', 'aprovado')
-    .order('created_at', { ascending: false })
+  const turmasDoAluno = new Map<string, { id: string; nome: string }[]>()
+  for (const m of escopo?.matriculas ?? []) {
+    const t = turmaMap.get(m.turma_id)
+    if (!t) continue
+    turmasDoAluno.set(m.aluno_id, [...(turmasDoAluno.get(m.aluno_id) ?? []), { id: t.id, nome: t.nome }])
+  }
+
+  // atestados + faltas dos alunos das turmas do professor
+  let atestados: AtestadoView[] = []
+  if (escopo && escopo.alunoIds.length > 0) {
+    const { data: ats, error: e1 } = await escopo.db
+      .from('atestados')
+      .select('id, aluno_id, data_inicio, data_fim, observacao, status, motivo_rejeicao, created_at')
+      .in('aluno_id', escopo.alunoIds)
+      .order('created_at', { ascending: false })
+    if (e1) erro = e1.message
+
+    const ids = (ats ?? []).map((a) => a.id as string)
+    const { data: fts } = ids.length
+      ? await escopo.db
+          .from('faltas_abonadas')
+          .select('id, atestado_id, data_falta, turma_id, observacao')
+          .in('atestado_id', ids)
+          .order('data_falta')
+      : { data: [] as { id: string; atestado_id: string; data_falta: string; turma_id: string | null; observacao: string | null }[] }
+
+    atestados = (ats ?? []).map((a) => ({
+      id: a.id,
+      alunoNome: alunoMap.get(a.aluno_id)?.full_name ?? '',
+      alunoEmail: alunoMap.get(a.aluno_id)?.email ?? '',
+      turmas: turmasDoAluno.get(a.aluno_id) ?? [],
+      inicio: a.data_inicio,
+      fim: a.data_fim,
+      observacao: a.observacao,
+      status: a.status,
+      motivo: a.motivo_rejeicao,
+      enviadoEm: a.created_at,
+      faltas: (fts ?? [])
+        .filter((f) => f.atestado_id === a.id)
+        .map((f) => ({
+          id: f.id,
+          data: f.data_falta,
+          turma: f.turma_id ? turmaMap.get(f.turma_id)?.nome ?? '' : '',
+          obs: f.observacao,
+        })),
+    }))
+  }
+
+  const conta = (s: string) => atestados.filter((a) => a.status === s).length
+  const cards = [
+    { r: 'Pendentes', v: conta('pendente'), c: 'text-yellow-600', destaque: conta('pendente') > 0 },
+    { r: 'Aprovados', v: conta('aprovado'), c: 'text-green-600' },
+    { r: 'Rejeitados', v: conta('rejeitado'), c: 'text-red-600' },
+    { r: 'Alunos', v: alunos.length, c: 'text-blue-700' },
+    { r: 'Turmas', v: turmas.length, c: 'text-blue-700' },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar userName={profile.full_name} role="professor" />
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-2">Atestados Aprovados</h1>
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold">Painel do Professor</h1>
+        <p className="text-sm text-gray-500 mb-6">
+          Atestados e alunos das suas turmas e unidades.
+        </p>
 
-        {nomesUnidades && (
-          <p className="text-sm text-gray-500 mb-6">Suas unidades: {nomesUnidades}</p>
+        {erro && (
+          <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">Erro ao carregar: {erro}</div>
         )}
 
-        {!atestados || atestados.length === 0 ? (
-          <div className="bg-white rounded-xl shadow p-8 text-center text-gray-500">
-            Nenhum atestado aprovado dos alunos das suas unidades.
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+          {cards.map((c) => (
+            <div
+              key={c.r}
+              className={`bg-white rounded-xl shadow p-3 ${c.destaque ? 'ring-2 ring-yellow-400' : ''}`}
+            >
+              <p className={`text-2xl font-bold ${c.c}`}>{c.v}</p>
+              <p className="text-xs text-gray-500">{c.r}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2 mb-6 border-b">
+          {[
+            { k: 'atestados', r: 'Atestados' },
+            { k: 'alunos', r: 'Meus alunos e turmas' },
+          ].map((t) => (
+            <Link
+              key={t.k}
+              href={`/professor?aba=${t.k}`}
+              className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 ${
+                aba === t.k ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {t.r}
+            </Link>
+          ))}
+        </div>
+
+        {turmas.length === 0 && !erro && (
+          <div className="mb-6 rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
+            Você ainda não tem turmas. O administrador precisa definir você como responsável de uma turma
+            ou associar você a uma unidade.
           </div>
+        )}
+
+        {aba === 'atestados' ? (
+          <ProfessorAtestados atestados={atestados} buscaInicial={busca ?? ''} />
         ) : (
-          <div className="space-y-4">
-            {atestados.map((a) => {
-              const aluno = a.aluno as { full_name?: string; email?: string } | null
-              const faltas = (a.faltas || []) as Array<{
-                id: string
-                data_falta: string
-                turma?: {
-                  nome?: string
-                  unidade?: { nome?: string } | { nome?: string }[] | null
-                } | null
-              }>
-
+          <div className="space-y-5">
+            {turmas.map((t) => {
+              const doAluno = (escopo?.matriculas ?? []).filter((m) => m.turma_id === t.id)
+              const lista = doAluno
+                .map((m) => alunoMap.get(m.aluno_id))
+                .filter((a): a is NonNullable<typeof a> => Boolean(a))
+                .sort((a, b) => a.full_name.localeCompare(b.full_name))
               return (
-                <div key={a.id} className="bg-white rounded-xl shadow p-5">
-                  <p className="font-semibold">{aluno?.full_name}</p>
-                  <p className="text-sm text-gray-500">{aluno?.email}</p>
-                  <p className="text-sm mt-1">
-                    Período: {formatDate(a.data_inicio)} até{' '}
-                    {formatDate(a.data_fim)}
-                  </p>
-                  {faltas.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-sm font-medium">Faltas abonadas:</p>
-                      <ul className="text-sm text-gray-600 list-disc list-inside">
-                        {faltas.map((f) => {
-                          const turmaNome = f.turma?.nome
-                          const unidadeRaw = f.turma?.unidade
-                          const unidadeNome = Array.isArray(unidadeRaw)
-                            ? unidadeRaw[0]?.nome
-                            : unidadeRaw?.nome
-
+                <div key={t.id} className="bg-white rounded-xl shadow overflow-hidden">
+                  <div className="px-5 py-3 border-b bg-gray-50 flex flex-wrap items-baseline justify-between gap-2">
+                    <div>
+                      <p className="font-semibold">{t.nome}</p>
+                      <p className="text-xs text-gray-500">
+                        {t.unidade} · {t.ano_letivo}
+                      </p>
+                    </div>
+                    <span className="text-xs text-gray-500">{lista.length} aluno(s)</span>
+                  </div>
+                  {lista.length === 0 ? (
+                    <p className="p-5 text-sm text-gray-400">Nenhum aluno matriculado.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-500">
+                          <th className="px-5 py-2">Aluno</th>
+                          <th className="px-5 py-2">E-mail</th>
+                          <th className="px-5 py-2 text-center">Pendentes</th>
+                          <th className="px-5 py-2 text-center">Aprovados</th>
+                          <th className="px-5 py-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lista.map((a) => {
+                          const meus = atestados.filter((x) => x.alunoEmail === a.email)
+                          const pend = meus.filter((x) => x.status === 'pendente').length
                           return (
-                            <li key={f.id}>
-                              {formatDate(f.data_falta)}
-                              {turmaNome && ` — ${turmaNome}`}
-                              {unidadeNome && ` (${unidadeNome})`}
-                            </li>
+                            <tr key={a.id} className="border-t">
+                              <td className="px-5 py-2 font-medium">
+                                {a.full_name}
+                                {!a.active && <span className="ml-2 text-xs text-red-500">(inativo)</span>}
+                              </td>
+                              <td className="px-5 py-2 text-gray-500">{a.email}</td>
+                              <td className={`px-5 py-2 text-center ${pend > 0 ? 'font-bold text-yellow-600' : ''}`}>
+                                {pend}
+                              </td>
+                              <td className="px-5 py-2 text-center">
+                                {meus.filter((x) => x.status === 'aprovado').length}
+                              </td>
+                              <td className="px-5 py-2 text-right">
+                                <Link
+                                  href={`/professor?aba=atestados&busca=${encodeURIComponent(a.full_name)}`}
+                                  className="text-xs text-blue-600 hover:underline"
+                                >
+                                  Ver atestados
+                                </Link>
+                              </td>
+                            </tr>
                           )
                         })}
-                      </ul>
-                    </div>
+                      </tbody>
+                    </table>
                   )}
                 </div>
               )
