@@ -7,6 +7,10 @@ type CookieToSet = {
   options?: Record<string, unknown>
 }
 
+
+
+
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
