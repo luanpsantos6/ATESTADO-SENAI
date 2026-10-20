@@ -12,10 +12,7 @@ export default async function AdminTurmasPage() {
   const { supabase, profile } = await requireRole('admin')
 
   const [turmasRes, unidadesRes, professoresRes, alunosRes] = await Promise.all([
-    supabase
-      .from('turmas')
-      .select('*, professor:users!turmas_professor_id_fkey(full_name), unidade:unidades(nome, cidade)')
-      .order('nome'),
+    supabase.from('turmas').select('*').order('nome'),
     supabase.from('unidades').select('*').order('cidade').returns<Unidade[]>(),
     supabase
       .from('users')
@@ -33,10 +30,18 @@ export default async function AdminTurmasPage() {
       .returns<User[]>(),
   ])
 
+  // Junta em código (sem depender de relacionamento do PostgREST) e mostra erros reais
+  const erros = [turmasRes.error, unidadesRes.error, professoresRes.error, alunosRes.error]
+    .filter(Boolean)
+    .map((e) => e!.message)
+
+  const unidades = unidadesRes.data ?? []
+  const professores = professoresRes.data ?? []
+
   const turmas: TurmaRow[] = (turmasRes.data ?? []).map((t) => ({
     ...t,
-    professor: one(t.professor),
-    unidade: one(t.unidade),
+    professor: professores.find((p) => p.id === t.professor_id) ?? null,
+    unidade: unidades.find((u) => u.id === t.unidade_id) ?? null,
   }))
 
   return (
@@ -44,6 +49,11 @@ export default async function AdminTurmasPage() {
       <Navbar userName={profile.full_name} role="admin" />
       <main className="max-w-5xl mx-auto px-4 py-8">
         <AdminPageHeader title="Turmas e Matrículas" />
+        {erros.length > 0 && (
+          <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            Erro ao carregar: {erros.join(' | ')}
+          </div>
+        )}
         <AdminTurmas
           turmas={turmas}
           unidades={unidadesRes.data ?? []}

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { friendlyError } from '@/lib/env'
 
 export type ActionResult = { error?: string; success?: string }
 
@@ -28,7 +29,7 @@ export async function login(formData: FormData): Promise<ActionResult | void> {
     }
   } catch (err) {
     console.error('[login]', err)
-    return { error: 'Não foi possível entrar agora. Tente novamente.' }
+    return { error: friendlyError(err) ?? 'Não foi possível entrar agora. Tente novamente.' }
   }
 
   revalidatePath('/', 'layout')
@@ -63,10 +64,12 @@ export async function register(formData: FormData): Promise<ActionResult> {
       password,
       options: { data: { full_name } },
     })
-    if (error) return { error: error.message }
+    if (error) {
+      return { error: friendlyError(error) ?? error.message }
+    }
   } catch (err) {
     console.error('[register]', err)
-    return { error: 'Não foi possível criar a conta agora.' }
+    return { error: friendlyError(err) ?? 'Não foi possível criar a conta agora.' }
   }
 
   return { success: 'Conta criada! Faça login.' }
