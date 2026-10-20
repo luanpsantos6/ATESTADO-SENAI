@@ -1,10 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+
+const MENU = [
+  { href: '/admin', rotulo: 'Painel' },
+  { href: '/admin/atestados', rotulo: 'Atestados' },
+  { href: '/admin/usuarios', rotulo: 'Usuários' },
+  { href: '/admin/turmas', rotulo: 'Turmas' },
+  { href: '/admin/relatorios', rotulo: 'Relatórios' },
+]
 
 export default function AdminPageHeader({ title }: { title: string }) {
   const router = useRouter()
+  const pathname = usePathname()
 
   // "Voltar" retorna à tela anterior de verdade; se não houver, vai ao painel.
   function voltar() {
@@ -13,14 +22,30 @@ export default function AdminPageHeader({ title }: { title: string }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-6">
-      <button type="button" onClick={voltar} className="text-sm text-blue-600 hover:underline">
-        ← Voltar
-      </button>
-      <Link href="/admin" className="text-sm text-gray-500 hover:underline">
-        Painel
-      </Link>
-      <h1 className="text-2xl font-bold">{title}</h1>
+    <div className="mb-6">
+      {/* menu do admin, presente em todas as telas */}
+      <nav className="flex flex-wrap gap-2 mb-4">
+        {MENU.map((m) => {
+          const ativo = m.href === '/admin' ? pathname === '/admin' : pathname.startsWith(m.href)
+          return (
+            <Link
+              key={m.href}
+              href={m.href}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                ativo ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border hover:bg-gray-50'
+              }`}
+            >
+              {m.rotulo}
+            </Link>
+          )
+        })}
+      </nav>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={voltar} className="text-sm text-blue-600 hover:underline">
+          ← Voltar
+        </button>
+        <h1 className="text-2xl font-bold">{title}</h1>
+      </div>
     </div>
   )
 }
