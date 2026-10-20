@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { friendlyError } from '@/lib/env'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export type ActionResult = { error?: string; success?: string }
 
@@ -60,14 +61,30 @@ export async function register(formData: FormData): Promise<ActionResult> {
   }
 
   try {
-    const supabase = await createClient()
-    const { error } = await supabase.auth.signUp({
+    // Cria já confirmada e SEM enviar e-mail (evita "email rate limit exceeded")
+    const admin = createAdminClient()
+    const { data, error } = await admin.auth.admin.createUser({
       email,
       password,
-      options: { data: { full_name, role } },
+      email_confirm: true,
+      user_metadata: { full_name, role },
     })
+
     if (error) {
+      if (/already|registered|exists/i.test(error.message)) {
+        return { error: 'Já existe uma conta com este e-mail.' }
+      }
       return { error: friendlyError(error) ?? error.message }
+    }
+
+    // Garante o perfil com o tipo escolhido (aluno ou professor, nunca admin)
+    const { error: profileError } = await admin
+      .from('users')
+      .upsert({ id: data.user.id, full_name, email, role, active: true }, { onConflict: 'id' })
+
+    if (profileError) {
+      await admin.auth.admin.deleteUser(data.user.id)
+      return { error: `Erro ao salvar perfil: ${profileError.message}` }
     }
   } catch (err) {
     console.error('[register]', err)
