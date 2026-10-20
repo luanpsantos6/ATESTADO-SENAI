@@ -120,10 +120,10 @@ export default function AdminTurmas({
   const normaliza = (t: string) =>
     t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
   const termos = normaliza(busca).split(/\s+/).filter(Boolean)
-  const alunosFiltrados = alunos.filter((a) => {
+  const resultados = alunos.filter((a) => {
     const alvo = normaliza(`${a.full_name} ${a.email}`)
-    return termos.every((t) => alvo.includes(t))
-  })
+    return termos.length > 0 && termos.every((t) => alvo.includes(t))
+  }).slice(0, 30)
 
   function toggleAluno(id: string) {
     setSelectedAlunos((prev) =>
@@ -240,36 +240,72 @@ export default function AdminTurmas({
               type="search"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Pesquisar pelo nome completo do aluno..."
+              placeholder="Digite o nome do aluno para pesquisar..."
               autoFocus
               className="w-full px-3 py-2 border rounded-lg text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-gray-500 mb-3">
-              {selectedAlunos.length} selecionado(s) · {alunosFiltrados.length} encontrado(s)
+
+            {/* Resultados: só aparecem quando há pesquisa */}
+            {termos.length > 0 && (
+              <div className="border rounded-lg mb-4 max-h-48 overflow-y-auto divide-y">
+                {resultados.length === 0 ? (
+                  <p className="p-3 text-sm text-gray-400">Nenhum aluno encontrado.</p>
+                ) : (
+                  resultados.map((a) => {
+                    const marcado = selectedAlunos.includes(a.id)
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => {
+                          if (!marcado) toggleAluno(a.id)
+                        }}
+                        disabled={marcado}
+                        className="w-full flex items-center justify-between gap-3 p-2.5 text-left text-sm hover:bg-blue-50 disabled:bg-gray-50 disabled:cursor-default"
+                      >
+                        <span>
+                          {a.full_name} <span className="text-gray-400">({a.email})</span>
+                        </span>
+                        <span className={marcado ? 'text-green-600 text-xs' : 'text-blue-600 text-xs font-medium'}>
+                          {marcado ? 'Já na turma' : '+ Adicionar'}
+                        </span>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            )}
+
+            {/* Alunos já selecionados para esta turma */}
+            <p className="text-sm font-medium mb-2">
+              Alunos nesta turma ({selectedAlunos.length})
             </p>
-            <div className="space-y-1 mb-6 max-h-60 overflow-y-auto">
-              {alunos.length === 0 && (
-                <p className="text-sm text-gray-400">Nenhum aluno cadastrado.</p>
+            <div className="mb-6 max-h-48 overflow-y-auto">
+              {selectedAlunos.length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  Nenhum aluno ainda. Pesquise acima para adicionar.
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {alunos
+                    .filter((a) => selectedAlunos.includes(a.id))
+                    .map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-1.5 text-sm"
+                      >
+                        <span>{a.full_name}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleAluno(a.id)}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Remover
+                        </button>
+                      </li>
+                    ))}
+                </ul>
               )}
-              {alunos.length > 0 && alunosFiltrados.length === 0 && (
-                <p className="text-sm text-gray-400">Nenhum aluno encontrado para essa pesquisa.</p>
-              )}
-              {alunosFiltrados.map((a) => (
-                <label
-                  key={a.id}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedAlunos.includes(a.id)}
-                    onChange={() => toggleAluno(a.id)}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm">
-                    {a.full_name} <span className="text-gray-400">({a.email})</span>
-                  </span>
-                </label>
-              ))}
             </div>
             <div className="flex gap-3">
               <button
