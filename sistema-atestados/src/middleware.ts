@@ -7,6 +7,8 @@ type CookieToSet = {
   options?: Record<string, unknown>
 }
 
+
+
 const PROTECTED_PREFIXES = ['/dashboard', '/admin', '/professor', '/aluno']
 const AUTH_PAGES = ['/login', '/register']
 
