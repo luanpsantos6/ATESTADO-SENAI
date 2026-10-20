@@ -4,33 +4,31 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
-export async function login(formData: FormData) {
-  const supabase = await createClient()
+export type ActionResult = { error?: string; success?: string }
 
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
+export async function login(formData: FormData): Promise<ActionResult | void> {
+  const email = String(formData.get('email') ?? '').trim().toLowerCase()
+  const password = String(formData.get('password') ?? '')
+  if (!email || !password) return { error: 'Informe e-mail e senha.' }
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error || !data.user) return { error: 'Credenciais inválidas.' }
 
-  if (error) {
-    return { error: 'Credenciais inválidas' }
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (user) {
     const { data: profile } = await supabase
       .from('users')
       .select('active')
-      .eq('id', user.id)
+      .eq('id', data.user.id)
       .single()
 
     if (profile && !profile.active) {
       await supabase.auth.signOut()
       return { error: 'Usuário desativado. Contate o administrador.' }
     }
+  } catch (err) {
+    console.error('[login]', err)
+    return { error: 'Não foi possível entrar agora. Tente novamente.' }
   }
 
   revalidatePath('/', 'layout')
@@ -38,29 +36,37 @@ export async function login(formData: FormData) {
 }
 
 export async function logout() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
+  try {
+    const supabase = await createClient()
+    await supabase.auth.signOut()
+  } catch (err) {
+    console.error('[logout]', err)
+  }
   revalidatePath('/', 'layout')
   redirect('/login')
 }
 
-export async function register(formData: FormData) {
-  const supabase = await createClient()
+// Cadastro público: SEMPRE cria aluno. O perfil nunca vem do formulário.
+export async function register(formData: FormData): Promise<ActionResult> {
+  const full_name = String(formData.get('full_name') ?? '').trim()
+  const email = String(formData.get('email') ?? '').trim().toLowerCase()
+  const password = String(formData.get('password') ?? '')
 
-  const full_name = formData.get('full_name') as string
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
+  if (!full_name || !email || password.length < 6) {
+    return { error: 'Preencha nome, e-mail e senha (mínimo 6 caracteres).' }
+  }
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name },
-    },
-  })
-
-  if (error) {
-    return { error: error.message }
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name } },
+    })
+    if (error) return { error: error.message }
+  } catch (err) {
+    console.error('[register]', err)
+    return { error: 'Não foi possível criar a conta agora.' }
   }
 
   return { success: 'Conta criada! Faça login.' }

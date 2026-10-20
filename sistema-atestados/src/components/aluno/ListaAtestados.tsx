@@ -2,8 +2,7 @@
 
 import { Atestado } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { formatDate, formatDateTime } from '@/lib/format'
 
 const statusColors: Record<string, string> = {
   pendente: 'bg-yellow-100 text-yellow-800',
@@ -49,13 +48,13 @@ export default function ListaAtestados({ atestados }: { atestados: Atestado[] })
             </span>
             <span className="text-sm text-gray-500">
               Enviado em{' '}
-              {format(new Date(a.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              {formatDateTime(a.created_at)}
             </span>
           </div>
           <p className="text-sm">
             <strong>Período:</strong>{' '}
-            {format(new Date(a.data_inicio), 'dd/MM/yyyy')} até{' '}
-            {format(new Date(a.data_fim), 'dd/MM/yyyy')}
+            {formatDate(a.data_inicio)} até{' '}
+            {formatDate(a.data_fim)}
           </p>
           {a.observacao && <p className="text-sm text-gray-600 mt-1">{a.observacao}</p>}
           {a.status === 'rejeitado' && a.motivo_rejeicao && (
@@ -68,7 +67,7 @@ export default function ListaAtestados({ atestados }: { atestados: Atestado[] })
               <p className="text-sm font-medium">Faltas abonadas:</p>
               <ul className="text-sm text-gray-600 list-disc list-inside">
                 {a.faltas.map((f) => (
-                  <li key={f.id}>{format(new Date(f.data_falta), 'dd/MM/yyyy')}</li>
+                  <li key={f.id}>{formatDate(f.data_falta)}</li>
                 ))}
               </ul>
             </div>

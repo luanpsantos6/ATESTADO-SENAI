@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Unidade, User } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
-type TurmaRow = {
+export type TurmaRow = {
   id: string
   nome: string
   ano_letivo: number
@@ -30,6 +30,9 @@ export default function AdminTurmas({
   alunos,
 }: Props) {
   const [turmas, setTurmas] = useState(initial)
+  useEffect(() => {
+    setTurmas(initial)
+  }, [initial])
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,7 +67,12 @@ export default function AdminTurmas({
 
   async function deleteTurma(id: string) {
     if (!confirm('Excluir esta turma?')) return
-    await supabase.from('turmas').delete().eq('id', id)
+    const { error: delError } = await supabase.from('turmas').delete().eq('id', id)
+    if (delError) {
+      setError(`Erro ao excluir turma: ${delError.message}`)
+      return
+    }
+    setError(null)
     setTurmas((prev) => prev.filter((t) => t.id !== id))
   }
 
@@ -81,16 +89,25 @@ export default function AdminTurmas({
 
   async function saveMatriculas(turmaId: string) {
     setLoading(true)
-    await supabase.from('matriculas').delete().eq('turma_id', turmaId)
+    const { error: delError } = await supabase.from('matriculas').delete().eq('turma_id', turmaId)
 
-    if (selectedAlunos.length > 0) {
-      await supabase.from('matriculas').insert(
+    let saveError = delError?.message
+    if (!saveError && selectedAlunos.length > 0) {
+      const { error: insError } = await supabase.from('matriculas').insert(
         selectedAlunos.map((aluno_id) => ({
           aluno_id,
           turma_id: turmaId,
         }))
       )
+      saveError = insError?.message
     }
+
+    if (saveError) {
+      setError(`Erro ao salvar matrículas: ${saveError}`)
+      setLoading(false)
+      return
+    }
+    setError(null)
 
     setEditingMatriculas(null)
     setLoading(false)
@@ -124,7 +141,7 @@ export default function AdminTurmas({
             name="ano_letivo"
             type="number"
             placeholder="Ano letivo"
-            defaultValue={2026}
+            defaultValue={new Date().getFullYear()}
             required
             className="w-full px-3 py-2 border rounded-lg"
           />
@@ -153,6 +170,10 @@ export default function AdminTurmas({
             {loading ? 'Criando...' : 'Criar turma'}
           </button>
         </form>
+      )}
+
+      {error && !showForm && (
+        <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg mb-4">{error}</p>
       )}
 
       <div className="bg-white rounded-xl shadow overflow-x-auto">

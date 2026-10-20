@@ -1,22 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import Navbar from '@/components/Navbar'
-import { format } from 'date-fns'
+import { requireRole } from '@/lib/auth'
+import { formatDate } from '@/lib/format'
 
 export default async function ProfessorPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || profile.role !== 'professor') redirect('/dashboard')
+  const { supabase, user, profile } = await requireRole('professor')
 
   const { data: minhasUnidades } = await supabase
     .from('professor_unidades')
@@ -78,8 +65,8 @@ export default async function ProfessorPage() {
                   <p className="font-semibold">{aluno?.full_name}</p>
                   <p className="text-sm text-gray-500">{aluno?.email}</p>
                   <p className="text-sm mt-1">
-                    Período: {format(new Date(a.data_inicio), 'dd/MM/yyyy')} até{' '}
-                    {format(new Date(a.data_fim), 'dd/MM/yyyy')}
+                    Período: {formatDate(a.data_inicio)} até{' '}
+                    {formatDate(a.data_fim)}
                   </p>
                   {faltas.length > 0 && (
                     <div className="mt-2">
@@ -94,7 +81,7 @@ export default async function ProfessorPage() {
 
                           return (
                             <li key={f.id}>
-                              {format(new Date(f.data_falta), 'dd/MM/yyyy')}
+                              {formatDate(f.data_falta)}
                               {turmaNome && ` — ${turmaNome}`}
                               {unidadeNome && ` (${unidadeNome})`}
                             </li>

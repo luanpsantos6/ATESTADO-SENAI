@@ -57,7 +57,7 @@ export interface Atestado {
   aprovado_por: string | null
   aprovado_em: string | null
   created_at: string
-  aluno?: User
+  aluno?: Pick<User, 'full_name' | 'email'> | null
   faltas?: FaltaAbonada[]
 }
 

@@ -24,7 +24,7 @@ export default function EnviarAtestado() {
     const observacao = formData.get('observacao') as string
     const arquivo = formData.get('arquivo') as File
 
-    if (new Date(dataFim) < new Date(dataInicio)) {
+    if (dataFim < dataInicio) {
       setError('Data fim não pode ser anterior à data início')
       setLoading(false)
       return
@@ -32,6 +32,12 @@ export default function EnviarAtestado() {
 
     if (!arquivo || arquivo.size === 0) {
       setError('Selecione um arquivo')
+      setLoading(false)
+      return
+    }
+
+    if (arquivo.size > 5 * 1024 * 1024) {
+      setError('O arquivo deve ter no máximo 5 MB')
       setLoading(false)
       return
     }
@@ -49,7 +55,7 @@ export default function EnviarAtestado() {
       } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
-      const ext = arquivo.name.split('.').pop()
+      const ext = (arquivo.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '')
       const fileName = `${user.id}/${Date.now()}.${ext}`
 
       const { error: uploadError } = await supabase.storage

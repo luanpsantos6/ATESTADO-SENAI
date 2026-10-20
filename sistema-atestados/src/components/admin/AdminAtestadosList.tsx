@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Atestado } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { format } from 'date-fns'
+import { formatDate } from '@/lib/format'
 import Link from 'next/link'
 
 const statusColors: Record<string, string> = {
@@ -39,12 +39,14 @@ export default function AdminAtestadosList({
   const [dataFalta, setDataFalta] = useState('')
   const [turmaId, setTurmaId] = useState('')
   const [obsFalta, setObsFalta] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
   async function aprovar(id: string) {
     setLoading(id)
-    await supabase
+    setError(null)
+    const { error: updError } = await supabase
       .from('atestados')
       .update({
         status: 'aprovado',
@@ -54,6 +56,7 @@ export default function AdminAtestadosList({
       })
       .eq('id', id)
     setLoading(null)
+    if (updError) return setError(`Erro ao aprovar: ${updError.message}`)
     router.refresh()
   }
 
@@ -63,16 +66,18 @@ export default function AdminAtestadosList({
       return
     }
     setLoading(id)
-    await supabase
+    setError(null)
+    const { error: updError } = await supabase
       .from('atestados')
       .update({
         status: 'rejeitado',
         aprovado_por: adminId,
         aprovado_em: new Date().toISOString(),
-        motivo_rejeicao: motivo,
+        motivo_rejeicao: motivo.trim(),
       })
       .eq('id', id)
     setLoading(null)
+    if (updError) return setError(`Erro ao rejeitar: ${updError.message}`)
     setRejectingId(null)
     setMotivo('')
     router.refresh()
@@ -84,7 +89,8 @@ export default function AdminAtestadosList({
       return
     }
     setLoading(atestadoId)
-    await supabase.from('faltas_abonadas').insert({
+    setError(null)
+    const { error: insError } = await supabase.from('faltas_abonadas').insert({
       atestado_id: atestadoId,
       data_falta: dataFalta,
       turma_id: turmaId || null,
@@ -92,6 +98,7 @@ export default function AdminAtestadosList({
       associado_por: adminId,
     })
     setLoading(null)
+    if (insError) return setError(`Erro ao associar falta: ${insError.message}`)
     setAssociatingId(null)
     setDataFalta('')
     setTurmaId('')
@@ -128,6 +135,8 @@ export default function AdminAtestadosList({
         ))}
       </div>
 
+      {error && <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg mb-4">{error}</p>}
+
       {atestados.length === 0 ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-500">
           Nenhum atestado encontrado.
@@ -141,8 +150,8 @@ export default function AdminAtestadosList({
                   <p className="font-semibold">{a.aluno?.full_name}</p>
                   <p className="text-sm text-gray-500">{a.aluno?.email}</p>
                   <p className="text-sm mt-1">
-                    {format(new Date(a.data_inicio), 'dd/MM/yyyy')} →{' '}
-                    {format(new Date(a.data_fim), 'dd/MM/yyyy')}
+                    {formatDate(a.data_inicio)} →{' '}
+                    {formatDate(a.data_fim)}
                   </p>
                   {a.observacao && (
                     <p className="text-sm text-gray-600 mt-1">{a.observacao}</p>
@@ -280,7 +289,7 @@ export default function AdminAtestadosList({
                   <ul className="list-disc list-inside text-gray-600">
                     {a.faltas.map((f) => (
                       <li key={f.id}>
-                        {format(new Date(f.data_falta), 'dd/MM/yyyy')}
+                        {formatDate(f.data_falta)}
                         {f.observacao && ` — ${f.observacao}`}
                       </li>
                     ))}

@@ -6,7 +6,9 @@ import { revalidatePath } from 'next/cache'
 
 const ROLES = ['admin', 'professor', 'aluno'] as const
 
-export async function createUserAsAdmin(formData: FormData) {
+export async function createUserAsAdmin(
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
   // 1) Garante que quem chama é admin ativo
   const supabase = await createClient()
   const {

@@ -6,7 +6,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { createUserAsAdmin } from '@/app/actions/admin'
 
-export default function AdminUsuarios({ users: initial }: { users: User[] }) {
+export default function AdminUsuarios({
+  users: initial,
+  currentUserId,
+}: {
+  users: User[]
+  currentUserId: string
+}) {
   const [users, setUsers] = useState(initial)
   const [unidades, setUnidades] = useState<Unidade[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -17,6 +23,11 @@ export default function AdminUsuarios({ users: initial }: { users: User[] }) {
   const router = useRouter()
   const supabase = createClient()
 
+  // router.refresh() traz novos dados do servidor; sincroniza o estado local
+  useEffect(() => {
+    setUsers(initial)
+  }, [initial])
+
   useEffect(() => {
     supabase
       .from('unidades')
@@ -25,13 +36,15 @@ export default function AdminUsuarios({ users: initial }: { users: User[] }) {
       .then(({ data }) => {
         if (data) setUnidades(data)
       })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function createUser(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const fd = new FormData(e.currentTarget)
+    const form = e.currentTarget
+    const fd = new FormData(form)
 
     const result = await createUserAsAdmin(fd)
 
@@ -41,18 +54,34 @@ export default function AdminUsuarios({ users: initial }: { users: User[] }) {
       return
     }
 
+    form.reset()
     setShowForm(false)
     setLoading(false)
     router.refresh()
   }
 
   async function toggleActive(id: string, current: boolean) {
-    await supabase.from('users').update({ active: !current }).eq('id', id)
+    if (id === currentUserId) return
+    const { error: updError } = await supabase
+      .from('users')
+      .update({ active: !current })
+      .eq('id', id)
+    if (updError) {
+      setError(`Erro ao alterar status: ${updError.message}`)
+      return
+    }
+    setError(null)
     setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, active: !current } : u)))
   }
 
   async function changeRole(id: string, role: Role) {
-    await supabase.from('users').update({ role }).eq('id', id)
+    if (id === currentUserId) return
+    const { error: updError } = await supabase.from('users').update({ role }).eq('id', id)
+    if (updError) {
+      setError(`Erro ao alterar perfil: ${updError.message}`)
+      return
+    }
+    setError(null)
     setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)))
   }
 
@@ -68,16 +97,28 @@ export default function AdminUsuarios({ users: initial }: { users: User[] }) {
 
   async function saveUnidades(professorId: string) {
     setLoading(true)
-    await supabase.from('professor_unidades').delete().eq('professor_id', professorId)
+    const { error: delError } = await supabase
+      .from('professor_unidades')
+      .delete()
+      .eq('professor_id', professorId)
 
-    if (selectedUnidades.length > 0) {
-      await supabase.from('professor_unidades').insert(
+    let saveError = delError?.message
+    if (!saveError && selectedUnidades.length > 0) {
+      const { error: insError } = await supabase.from('professor_unidades').insert(
         selectedUnidades.map((unidade_id) => ({
           professor_id: professorId,
           unidade_id,
         }))
       )
+      saveError = insError?.message
     }
+
+    if (saveError) {
+      setError(`Erro ao salvar unidades: ${saveError}`)
+      setLoading(false)
+      return
+    }
+    setError(null)
 
     setEditingUnidades(null)
     setLoading(false)
@@ -138,6 +179,10 @@ export default function AdminUsuarios({ users: initial }: { users: User[] }) {
         </form>
       )}
 
+      {error && !showForm && (
+        <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg mb-4">{error}</p>
+      )}
+
       <div className="bg-white rounded-xl shadow overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
@@ -158,6 +203,7 @@ export default function AdminUsuarios({ users: initial }: { users: User[] }) {
                   <select
                     value={u.role}
                     onChange={(e) => changeRole(u.id, e.target.value as Role)}
+                    disabled={u.id === currentUserId}
                     className="border rounded px-2 py-1 text-xs"
                   >
                     <option value="aluno">aluno</option>
@@ -173,7 +219,8 @@ export default function AdminUsuarios({ users: initial }: { users: User[] }) {
                 <td className="px-4 py-3 space-x-2">
                   <button
                     onClick={() => toggleActive(u.id, u.active)}
-                    className="text-xs text-blue-600 hover:underline"
+                    disabled={u.id === currentUserId}
+                    className="text-xs text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
                   >
                     {u.active ? 'Desativar' : 'Ativar'}
                   </button>
