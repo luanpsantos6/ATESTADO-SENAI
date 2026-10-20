@@ -47,11 +47,13 @@ export async function logout() {
   redirect('/login')
 }
 
-// Cadastro público: SEMPRE cria aluno. O perfil nunca vem do formulário.
+// Cadastro público: o usuário escolhe Aluno ou Professor. 'admin' NUNCA é aceito aqui.
 export async function register(formData: FormData): Promise<ActionResult> {
   const full_name = String(formData.get('full_name') ?? '').trim()
   const email = String(formData.get('email') ?? '').trim().toLowerCase()
   const password = String(formData.get('password') ?? '')
+  const tipo = String(formData.get('tipo') ?? 'aluno')
+  const role = tipo === 'professor' ? 'professor' : 'aluno'
 
   if (!full_name || !email || password.length < 6) {
     return { error: 'Preencha nome, e-mail e senha (mínimo 6 caracteres).' }
@@ -62,7 +64,7 @@ export async function register(formData: FormData): Promise<ActionResult> {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name } },
+      options: { data: { full_name, role } },
     })
     if (error) {
       return { error: friendlyError(error) ?? error.message }

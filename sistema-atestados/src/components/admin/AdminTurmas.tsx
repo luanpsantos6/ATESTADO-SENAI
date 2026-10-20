@@ -38,6 +38,7 @@ export default function AdminTurmas({
   const [error, setError] = useState<string | null>(null)
   const [editingMatriculas, setEditingMatriculas] = useState<string | null>(null)
   const [selectedAlunos, setSelectedAlunos] = useState<string[]>([])
+  const [busca, setBusca] = useState('')
   const router = useRouter()
   const supabase = createClient()
 
@@ -84,6 +85,7 @@ export default function AdminTurmas({
 
     const ids = data?.map((m) => m.aluno_id) || []
     setSelectedAlunos(ids)
+    setBusca('')
     setEditingMatriculas(turmaId)
   }
 
@@ -113,6 +115,15 @@ export default function AdminTurmas({
     setLoading(false)
     router.refresh()
   }
+
+  // busca sem diferenciar maiúsculas/acentos, por nome completo ou e-mail
+  const normaliza = (t: string) =>
+    t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  const termos = normaliza(busca).split(/\s+/).filter(Boolean)
+  const alunosFiltrados = alunos.filter((a) => {
+    const alvo = normaliza(`${a.full_name} ${a.email}`)
+    return termos.every((t) => alvo.includes(t))
+  })
 
   function toggleAluno(id: string) {
     setSelectedAlunos((prev) =>
@@ -225,12 +236,25 @@ export default function AdminTurmas({
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Matricular Alunos</h3>
-            <p className="text-sm text-gray-500 mb-4">Selecione os alunos desta turma:</p>
-            <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Pesquisar pelo nome completo do aluno..."
+              autoFocus
+              className="w-full px-3 py-2 border rounded-lg text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-500 mb-3">
+              {selectedAlunos.length} selecionado(s) · {alunosFiltrados.length} encontrado(s)
+            </p>
+            <div className="space-y-1 mb-6 max-h-60 overflow-y-auto">
               {alunos.length === 0 && (
                 <p className="text-sm text-gray-400">Nenhum aluno cadastrado.</p>
               )}
-              {alunos.map((a) => (
+              {alunos.length > 0 && alunosFiltrados.length === 0 && (
+                <p className="text-sm text-gray-400">Nenhum aluno encontrado para essa pesquisa.</p>
+              )}
+              {alunosFiltrados.map((a) => (
                 <label
                   key={a.id}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"

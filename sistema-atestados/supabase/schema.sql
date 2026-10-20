@@ -119,7 +119,7 @@ AS $$
 DECLARE
   v_role TEXT := COALESCE(NEW.raw_user_meta_data->>'role', 'aluno');
 BEGIN
-  IF v_role NOT IN ('admin', 'professor', 'aluno') THEN
+  IF v_role NOT IN ('professor', 'aluno') THEN
     v_role := 'aluno';
   END IF;
 

@@ -11,8 +11,6 @@ export function normalizeUrl(raw: string | undefined) {
   return url.replace(/\/+$/, '')
 }
 
-
-
 export function getSupabaseEnv() {
   return {
     url: normalizeUrl(process.env.NEXT_PUBLIC_SUPABASE_URL),
