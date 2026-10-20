@@ -1,5 +1,6 @@
 import Navbar from '@/components/Navbar'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import AdminResumo from '@/components/admin/AdminResumo'
 import AdminAtestadosList from '@/components/admin/AdminAtestadosList'
 import { requireRole } from '@/lib/auth'
 import type { Atestado } from '@/types/database'
@@ -33,6 +34,7 @@ export default async function AdminAtestadosPage({
       <Navbar userName={profile.full_name} role="admin" />
       <main className="max-w-5xl mx-auto px-4 py-8">
         <AdminPageHeader title="Gerenciar Atestados" />
+        <AdminResumo />
         <AdminAtestadosList
           atestados={atestados ?? []}
           turmas={turmas ?? []}
