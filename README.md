@@ -73,3 +73,9 @@ Título: **SENAI MT — Sistema de Atestados Médicos**
 2. Aluno: aba **Justificar atraso** (data, horário de chegada, motivo, explicação e comprovante opcional).
 3. Professor (aba **Atrasos**) e Administrador (**/admin/atrasos**) aprovam ou rejeitam.
 4. Relatórios: tipo **Justificativas de atraso** (filtros, agrupamento, Excel e PDF).
+
+## App instalável (PWA)
+
+- `src/app/manifest.ts`, `public/sw.js`, `public/offline.html` e os ícones `public/icon-*.png` tornam o sistema instalável.
+- `src/components/PwaInstall.tsx` mostra, só em celulares (iPhone e Android) que ainda não instalaram, um aviso para adicionar o app à tela inicial. Android: botão "Instalar aplicativo"; iPhone: passo a passo (Compartilhar → Adicionar à Tela de Início).
+- O PWA exige **HTTPS** (a Vercel já fornece) e o service worker só é registrado em produção.
