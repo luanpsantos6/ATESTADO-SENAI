@@ -37,7 +37,7 @@ export async function profAprovar(atestadoId: string): Promise<Res> {
     const p = await comPermissao(atestadoId)
     if ('erro' in p) return { error: p.erro }
     if (p.atestado.status !== 'pendente') return { error: 'Este atestado já foi analisado.' }
-    const { error } = await p.escopo.db
+    const { data: decisao, error } = await p.escopo.db
       .from('atestados')
       .update({
         status: 'aprovado',
@@ -46,8 +46,20 @@ export async function profAprovar(atestadoId: string): Promise<Res> {
         motivo_rejeicao: null,
       })
       .eq('id', atestadoId)
+      .eq('status', 'pendente')
+      .select('id')
+      .maybeSingle()
     if (error) return { error: error.message }
+
+    if (!decisao) {
+      return {
+        error: 'Este atestado já foi analisado por outro responsável.'
+      }
+    }
     revalidatePath('/professor')
+    revalidatePath('/admin/atestados')
+    revalidatePath('/admin')
+    revalidatePath('/aluno')
     return { success: true }
   } catch (e) {
     return { error: friendlyError(e) ?? (e as Error).message }
@@ -60,7 +72,7 @@ export async function profRejeitar(atestadoId: string, motivo: string): Promise<
     const p = await comPermissao(atestadoId)
     if ('erro' in p) return { error: p.erro }
     if (p.atestado.status !== 'pendente') return { error: 'Este atestado já foi analisado.' }
-    const { error } = await p.escopo.db
+    const { data: decisao, error } = await p.escopo.db
       .from('atestados')
       .update({
         status: 'rejeitado',
@@ -69,8 +81,20 @@ export async function profRejeitar(atestadoId: string, motivo: string): Promise<
         motivo_rejeicao: motivo.trim(),
       })
       .eq('id', atestadoId)
+      .eq('status', 'pendente')
+      .select('id')
+      .maybeSingle()
     if (error) return { error: error.message }
+
+    if (!decisao) {
+      return {
+        error: 'Este atestado já foi analisado por outro responsável.'
+      }
+    }
     revalidatePath('/professor')
+    revalidatePath('/admin/atestados')
+    revalidatePath('/admin')
+    revalidatePath('/aluno')
     return { success: true }
   } catch (e) {
     return { error: friendlyError(e) ?? (e as Error).message }

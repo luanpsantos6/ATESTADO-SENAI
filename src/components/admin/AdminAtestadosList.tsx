@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/format'
 import NavLink from '@/components/NavLink'
 import Spinner from '@/components/Spinner'
+import { analisarAtestadoAdmin } from '@/app/actions/atestados'
 
 const statusColors: Record<string, string> = {
   pendente: 'bg-yellow-100 text-yellow-800',
@@ -47,41 +48,52 @@ export default function AdminAtestadosList({
   async function aprovar(id: string) {
     setLoading(id)
     setError(null)
-    const { error: updError } = await supabase
-      .from('atestados')
-      .update({
-        status: 'aprovado',
-        aprovado_por: adminId,
-        aprovado_em: new Date().toISOString(),
-        motivo_rejeicao: null,
-      })
-      .eq('id', id)
-    setLoading(null)
-    if (updError) return setError(`Erro ao aprovar: ${updError.message}`)
-    router.refresh()
+
+    try {
+      const r = await analisarAtestadoAdmin(id, 'aprovado')
+
+      if (r.error) {
+        setError(r.error)
+      }
+
+      router.refresh()
+    } catch {
+      setError('Não foi possível concluir a aprovação.')
+    } finally {
+      setLoading(null)
+    }
   }
 
   async function rejeitar(id: string) {
     if (!motivo.trim()) {
-      alert('Informe o motivo da rejeição')
+      setError('Informe o motivo da rejeição.')
       return
     }
+
     setLoading(id)
     setError(null)
-    const { error: updError } = await supabase
-      .from('atestados')
-      .update({
-        status: 'rejeitado',
-        aprovado_por: adminId,
-        aprovado_em: new Date().toISOString(),
-        motivo_rejeicao: motivo.trim(),
-      })
-      .eq('id', id)
-    setLoading(null)
-    if (updError) return setError(`Erro ao rejeitar: ${updError.message}`)
-    setRejectingId(null)
-    setMotivo('')
-    router.refresh()
+
+    try {
+      const r = await analisarAtestadoAdmin(
+        id,
+        'rejeitado',
+        motivo
+      )
+
+      if (r.error) {
+        setError(r.error)
+        router.refresh()
+        return
+      }
+
+      setRejectingId(null)
+      setMotivo('')
+      router.refresh()
+    } catch {
+      setError('Não foi possível concluir a rejeição.')
+    } finally {
+      setLoading(null)
+    }
   }
 
   async function associarFalta(atestadoId: string) {
@@ -164,6 +176,69 @@ export default function AdminAtestadosList({
                   {a.status}
                 </span>
               </div>
+
+              {(a.status === 'aprovado' ||
+                a.status === 'rejeitado') && (
+                <div className={`mt-3 rounded-lg border p-3 ${
+                  a.status === 'aprovado'
+                    ? 'bg-green-50 border-green-100'
+                    : 'bg-red-50 border-red-100'
+                }`}>
+
+                  <p className={`text-xs font-semibold mb-2 ${
+                    a.status === 'aprovado'
+                      ? 'text-green-700'
+                      : 'text-red-700'
+                  }`}>
+                    {a.status === 'aprovado'
+                      ? 'Informações da aprovação'
+                      : 'Informações da rejeição'}
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        {a.status === 'aprovado'
+                          ? 'Aprovado por'
+                          : 'Rejeitado por'}
+                      </p>
+
+                      <p className="text-sm font-semibold text-gray-800">
+                        {a.responsavel?.full_name ??
+                          'Responsável não identificado'}
+                      </p>
+
+                      {a.responsavel && (
+                        <p className="text-xs text-gray-500">
+                          {a.responsavel.role === 'admin'
+                            ? 'Administrador'
+                            : a.responsavel.role === 'professor'
+                              ? 'Professor'
+                              : 'Outro perfil'}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        Data e horário da decisão
+                      </p>
+
+                      <p className="text-sm font-semibold text-gray-800">
+                        {a.aprovado_em
+                          ? new Intl.DateTimeFormat('pt-BR', {
+                              dateStyle: 'short',
+                              timeStyle: 'medium',
+                              timeZone: 'America/Cuiaba',
+                            }).format(new Date(a.aprovado_em))
+                          : 'Não registrado'}
+                      </p>
+                    </div>
+
+                  </div>
+                </div>
+              )}
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <button

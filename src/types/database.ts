@@ -55,6 +55,7 @@ export interface Atestado {
   status: AtestadoStatus
   motivo_rejeicao: string | null
   aprovado_por: string | null
+  responsavel?: Pick<User, 'full_name' | 'role'> | null
   aprovado_em: string | null
   created_at: string
   aluno?: Pick<User, 'full_name' | 'email'> | null

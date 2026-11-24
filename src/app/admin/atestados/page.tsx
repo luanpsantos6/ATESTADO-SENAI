@@ -29,6 +29,35 @@ export default async function AdminAtestadosPage({
     supabase.from('turmas').select('id, nome, ano_letivo').order('nome'),
   ])
 
+  const idsResponsaveis = [...new Set(
+    (atestados ?? [])
+      .map(a => a.aprovado_por)
+      .filter((id): id is string => Boolean(id))
+  )]
+
+  const { data: responsaveis, error: erroResponsaveis } =
+    idsResponsaveis.length
+      ? await supabase
+          .from('users')
+          .select('id, full_name, role')
+          .in('id', idsResponsaveis)
+      : { data: [], error: null }
+
+  if (erroResponsaveis) {
+    throw new Error('Não foi possível consultar os responsáveis.')
+  }
+
+  const mapaResponsaveis = new Map(
+    (responsaveis ?? []).map(r => [r.id, r])
+  )
+
+  const atestadosComResponsavel = (atestados ?? []).map(a => ({
+    ...a,
+    responsavel: a.aprovado_por
+      ? mapaResponsaveis.get(a.aprovado_por) ?? null
+      : null,
+  }))
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar userName={profile.full_name} role="admin" />
@@ -36,7 +65,7 @@ export default async function AdminAtestadosPage({
         <AdminPageHeader title="Gerenciar Atestados" />
         <AdminResumo />
         <AdminAtestadosList
-          atestados={atestados ?? []}
+          atestados={atestadosComResponsavel}
           turmas={turmas ?? []}
           currentStatus={status}
           adminId={user.id}
