@@ -21,9 +21,11 @@ const normaliza = (t: string) =>
 export default function AnaliseAtrasos({
   atrasos,
   buscaInicial = '',
+  permitirTicket = false,
 }: {
   atrasos: AtrasoView[]
   buscaInicial?: string
+  permitirTicket?: boolean
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -149,6 +151,16 @@ export default function AnaliseAtrasos({
                       {agindo === a.id && !pending && <Spinner className="h-3.5 w-3.5" />} Ver comprovante
                     </button>
                   )}
+                  {permitirTicket && a.status === 'aprovada' && (
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/admin/atrasos/ticket/${a.id}`)}
+                      className="inline-flex items-center gap-2 text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                    >
+                      Emitir ticket
+                    </button>
+                  )}
+
                   {a.status === 'pendente' && (
                     <>
                       <button

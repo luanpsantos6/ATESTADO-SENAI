@@ -7,7 +7,7 @@ import { usuarioAtual } from '@/lib/acesso'
 import { carregarEscopo } from '@/lib/professor'
 import { CATEGORIAS } from '@/lib/atrasos'
 
-type Res = { error?: string; success?: boolean; url?: string }
+type Res = { error?: string; success?: boolean; url?: string; id?: string }
 
 const TIPOS = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
 const MAX_BYTES = 4 * 1024 * 1024 // limite de corpo da Vercel ≈ 4,5 MB
@@ -78,7 +78,10 @@ export async function enviarJustificativa(formData: FormData): Promise<Res> {
       if (upErr) return { error: `Erro ao enviar o comprovante: ${upErr.message}` }
     }
 
-    const { error } = await db.from('justificativas_atraso').insert({
+    const liberacaoDireta = me.role === 'admin'
+    const agora = new Date().toISOString()
+
+    const { data: registro, error } = await db.from('justificativas_atraso').insert({
       aluno_id: alunoId,
       solicitado_por: me.id,
       data_atraso: data,
@@ -86,8 +89,10 @@ export async function enviarJustificativa(formData: FormData): Promise<Res> {
       categoria,
       descricao,
       arquivo_url: caminho,
-      status: 'pendente',
-    })
+      status: liberacaoDireta ? 'aprovada' : 'pendente',
+      analisado_por: liberacaoDireta ? me.id : null,
+      analisado_em: liberacaoDireta ? agora : null,
+    }).select('id').single()
     if (error) {
       if (caminho) await db.storage.from('atestados').remove([caminho])
       return { error: msgErro(error) }
@@ -97,7 +102,7 @@ export async function enviarJustificativa(formData: FormData): Promise<Res> {
     revalidatePath('/admin')
     revalidatePath('/admin/atrasos')
     revalidatePath('/professor')
-    return { success: true }
+    return { success: true, id: registro.id }
   } catch (e) {
     return { error: msgErro(e) }
   }

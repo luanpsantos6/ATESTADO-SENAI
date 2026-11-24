@@ -114,6 +114,12 @@ export default function AdminNovaJustificativa() {
         return
       }
 
+      if (r.id) {
+        setAberto(false)
+        router.push(`/admin/atrasos/ticket/${r.id}`)
+        return
+      }
+
       setOk(true)
       setSelecionado(null)
       setAlunos([])
@@ -168,14 +174,14 @@ export default function AdminNovaJustificativa() {
             </div>
 
             <p className="text-sm text-gray-500 mb-5">
-              Registre uma justificativa em nome de um aluno.
+              Registre o atraso e autorize imediatamente a entrada do aluno.
             </p>
 
             {ok ? (
               <div className="space-y-4">
                 <div className="rounded-lg bg-green-50 p-4 text-sm text-green-800">
                   Justificativa registrada com sucesso!
-                  A solicitação está pendente de análise.
+                  A entrada foi autorizada. Consulte a aba Aprovadas para emitir o ticket.
                 </div>
 
                 <button
@@ -408,7 +414,7 @@ export default function AdminNovaJustificativa() {
                     >
                       {salvando
                         ? <><Spinner /> Registrando...</>
-                        : 'Registrar justificativa'}
+                        : 'Autorizar entrada e emitir ticket'}
                     </button>
 
                     <button

@@ -27,7 +27,7 @@ export default async function AdminAtrasosPage({
         {erro && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{erroAtrasos(erro)}</div>
         )}
-        <AnaliseAtrasos atrasos={atrasos} buscaInicial={busca ?? ''} />
+        <AnaliseAtrasos permitirTicket atrasos={atrasos} buscaInicial={busca ?? ''} />
       </main>
     </div>
   )
