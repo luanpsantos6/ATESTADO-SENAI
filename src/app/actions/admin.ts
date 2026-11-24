@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { friendlyError } from '@/lib/env'
+import { normalizarCPF, validarCPF } from '@/lib/cpf'
 
 const ROLES = ['admin', 'professor', 'aluno'] as const
 
@@ -32,6 +33,11 @@ export async function createUserAsAdmin(
   const email = String(formData.get('email') || '').trim().toLowerCase()
   const password = String(formData.get('password') || '')
   const role = String(formData.get('role') || 'aluno')
+  const cpf = normalizarCPF(String(formData.get('cpf') || ''))
+
+  if (role === 'aluno' && !validarCPF(cpf)) {
+    return { error: 'Informe um CPF válido para o aluno.' }
+  }
 
   if (!full_name || !email || password.length < 6) {
     return { error: 'Preencha nome, e-mail e senha (mínimo 6 caracteres).' }
@@ -42,6 +48,23 @@ export async function createUserAsAdmin(
 
   // 3) Cria o usuário sem mexer na sessão do admin e sem enviar e-mail
   const admin = createAdminClient()
+
+  if (role === 'aluno') {
+    const { data: existente, error: cpfErro } = await admin
+      .from('alunos_documentos')
+      .select('aluno_id')
+      .eq('cpf', cpf)
+      .maybeSingle()
+
+    if (cpfErro) {
+      return { error: 'Não foi possível verificar o CPF.' }
+    }
+
+    if (existente) {
+      return { error: 'CPF já cadastrado para outro aluno.' }
+    }
+  }
+
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
@@ -66,6 +89,32 @@ export async function createUserAsAdmin(
     // evita ficar usuário "órfão" no Auth sem perfil
     await admin.auth.admin.deleteUser(data.user.id)
     return { error: `Erro ao salvar perfil: ${profileError.message}` }
+  }
+
+  if (role === 'aluno') {
+    const { error: docError } = await admin
+      .from('alunos_documentos')
+      .insert({
+        aluno_id: data.user.id,
+        cpf,
+      })
+
+    if (docError) {
+      const { error: rollbackError } =
+        await admin.auth.admin.deleteUser(data.user.id)
+
+      if (rollbackError) {
+        return {
+          error: 'Falha ao salvar CPF e desfazer cadastro. Verifique o usuário no painel.'
+        }
+      }
+
+      return {
+        error: docError.code === '23505'
+          ? 'CPF já cadastrado.'
+          : 'Não foi possível salvar o CPF.'
+      }
+    }
   }
 
   revalidatePath('/admin/usuarios')

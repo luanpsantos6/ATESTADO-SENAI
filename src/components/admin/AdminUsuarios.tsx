@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { createUserAsAdmin, resetPasswordAsAdmin } from '@/app/actions/admin'
 import Spinner from '@/components/Spinner'
+import { formatarCPF } from '@/lib/cpf'
+import { salvarCPFAluno } from '@/app/actions/alunos'
 
 export default function AdminUsuarios({
   users: initial,
@@ -17,6 +19,12 @@ export default function AdminUsuarios({
   const [users, setUsers] = useState(initial)
   const [unidades, setUnidades] = useState<Unidade[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [novoRole, setNovoRole] = useState<Role>('aluno')
+  const [novoCPF, setNovoCPF] = useState('')
+  const [editandoCPF, setEditandoCPF] = useState<User | null>(null)
+  const [cpfEdicao, setCpfEdicao] = useState('')
+  const [cpfErro, setCpfErro] = useState<string | null>(null)
+  const [cpfLoading, setCpfLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingUnidades, setEditingUnidades] = useState<string | null>(null)
@@ -87,6 +95,8 @@ export default function AdminUsuarios({
     }
 
     form.reset()
+    setNovoCPF('')
+    setNovoRole('aluno')
     setShowForm(false)
     setLoading(false)
     router.refresh()
@@ -195,11 +205,30 @@ export default function AdminUsuarios({
             minLength={6}
             className="w-full px-3 py-2 border rounded-lg"
           />
-          <select name="role" className="w-full px-3 py-2 border rounded-lg">
+          <select
+            name="role"
+            value={novoRole}
+            onChange={(e) => setNovoRole(e.target.value as Role)}
+            className="w-full px-3 py-2 border rounded-lg"
+          >
             <option value="aluno">Aluno</option>
             <option value="professor">Professor</option>
             <option value="admin">Admin</option>
           </select>
+
+          {novoRole === 'aluno' && (
+            <input
+              name="cpf"
+              placeholder="CPF do aluno"
+              inputMode="numeric"
+              value={novoCPF}
+              onChange={(e) => setNovoCPF(formatarCPF(e.target.value))}
+              maxLength={14}
+              required
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+          )}
+
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <button
             type="submit"
@@ -262,6 +291,18 @@ export default function AdminUsuarios({
                   >
                     Redefinir senha
                   </button>
+                  {u.role === 'aluno' && (
+                    <button
+                      onClick={() => {
+                        setEditandoCPF(u)
+                        setCpfEdicao('')
+                        setCpfErro(null)
+                      }}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Editar CPF
+                    </button>
+                  )}
                   {u.role === 'professor' && (
                     <button
                       onClick={() => openUnidades(u.id)}
@@ -321,6 +362,99 @@ export default function AdminUsuarios({
           </div>
         </div>
       )}
+
+      {editandoCPF && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+
+            <h3 className="text-lg font-semibold mb-1">
+              Editar CPF
+            </h3>
+
+            <p className="text-sm text-gray-500 mb-4">
+              {editandoCPF.full_name}
+            </p>
+
+            <form
+              className="space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (cpfLoading) return
+                setCpfLoading(true)
+                setCpfErro(null)
+
+                try {
+                  const r = await salvarCPFAluno(
+                    editandoCPF.id,
+                    cpfEdicao
+                  )
+
+                  if (r.error) {
+                    setCpfErro(r.error)
+                    return
+                  }
+
+                  setEditandoCPF(null)
+                  setCpfEdicao('')
+                  router.refresh()
+                } catch {
+                  setCpfErro('Não foi possível salvar o CPF.')
+                } finally {
+                  setCpfLoading(false)
+                }
+              }}
+            >
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  CPF do aluno
+                </label>
+
+                <input
+                  value={cpfEdicao}
+                  onChange={(e) =>
+                    setCpfEdicao(formatarCPF(e.target.value))
+                  }
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
+                  maxLength={14}
+                  required
+                  autoFocus
+                  className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {cpfErro && (
+                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                  {cpfErro}
+                </p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={cpfLoading}
+                  className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {cpfLoading
+                    ? <><Spinner /> Salvando...</>
+                    : 'Salvar CPF'}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={cpfLoading}
+                  onClick={() => setEditandoCPF(null)}
+                  className="text-sm text-gray-600 px-4 py-2"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
       {resetUser && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">

@@ -24,7 +24,17 @@ function msgErro(e: unknown) {
 export async function enviarJustificativa(formData: FormData): Promise<Res> {
   try {
     const me = await usuarioAtual()
-    if (!me || me.role !== 'aluno') return { error: 'Apenas alunos podem justificar atrasos.' }
+    if (!me || !['aluno', 'admin'].includes(me.role)) {
+      return { error: 'Você não tem permissão para justificar atrasos.' }
+    }
+
+    const alunoId = me.role === 'admin'
+      ? String(formData.get('aluno_id') ?? '').trim()
+      : me.id
+
+    if (!alunoId) {
+      return { error: 'Selecione um aluno.' }
+    }
 
     const data = String(formData.get('data_atraso') ?? '')
     const horario = String(formData.get('horario_chegada') ?? '')
@@ -42,12 +52,26 @@ export async function enviarJustificativa(formData: FormData): Promise<Res> {
 
     const db = createAdminClient()
 
+    if (me.role === 'admin') {
+      const { data: aluno, error: alunoErro } = await db
+        .from('users')
+        .select('id')
+        .eq('id', alunoId)
+        .eq('role', 'aluno')
+        .eq('active', true)
+        .maybeSingle()
+
+      if (alunoErro || !aluno) {
+        return { error: 'Aluno inválido ou inativo.' }
+      }
+    }
+
     let caminho: string | null = null
     if (arquivo instanceof File && arquivo.size > 0) {
       if (arquivo.size > MAX_BYTES) return { error: 'O comprovante deve ter no máximo 4 MB.' }
       if (!TIPOS.includes(arquivo.type)) return { error: 'Comprovante: apenas PDF, JPG ou PNG.' }
       const ext = (arquivo.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '')
-      caminho = `justificativas/${me.id}/${Date.now()}.${ext}`
+      caminho = `justificativas/${alunoId}/${crypto.randomUUID()}.${ext}`
       const { error: upErr } = await db.storage
         .from('atestados')
         .upload(caminho, Buffer.from(await arquivo.arrayBuffer()), { contentType: arquivo.type })
@@ -55,7 +79,8 @@ export async function enviarJustificativa(formData: FormData): Promise<Res> {
     }
 
     const { error } = await db.from('justificativas_atraso').insert({
-      aluno_id: me.id,
+      aluno_id: alunoId,
+      solicitado_por: me.id,
       data_atraso: data,
       horario_chegada: horario,
       categoria,
@@ -69,6 +94,9 @@ export async function enviarJustificativa(formData: FormData): Promise<Res> {
     }
 
     revalidatePath('/aluno')
+    revalidatePath('/admin')
+    revalidatePath('/admin/atrasos')
+    revalidatePath('/professor')
     return { success: true }
   } catch (e) {
     return { error: msgErro(e) }

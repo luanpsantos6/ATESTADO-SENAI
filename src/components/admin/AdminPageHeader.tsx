@@ -12,7 +12,13 @@ const MENU = [
   { href: '/admin/relatorios', rotulo: 'Relatórios' },
 ]
 
-export default function AdminPageHeader({ title }: { title: string }) {
+export default function AdminPageHeader({
+  title,
+  actions,
+}: {
+  title: string
+  actions?: React.ReactNode
+}) {
   const router = useRouter()
   const pathname = usePathname()
 
@@ -46,6 +52,7 @@ export default function AdminPageHeader({ title }: { title: string }) {
           ← Voltar
         </button>
         <h1 className="text-2xl font-bold">{title}</h1>
+        {actions}
       </div>
     </div>
   )

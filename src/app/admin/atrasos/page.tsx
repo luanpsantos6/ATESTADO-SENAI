@@ -1,3 +1,4 @@
+import AdminNovaJustificativa from '@/components/admin/AdminNovaJustificativa'
 import Navbar from '@/components/Navbar'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import AdminResumo from '@/components/admin/AdminResumo'
@@ -18,7 +19,10 @@ export default async function AdminAtrasosPage({
     <div className="min-h-screen bg-gray-50">
       <Navbar userName={profile.full_name} role="admin" />
       <main className="max-w-5xl mx-auto px-4 py-8">
-        <AdminPageHeader title="Justificativas de atraso" />
+        <AdminPageHeader
+          title="Justificativas de atraso"
+          actions={<AdminNovaJustificativa />}
+        />
         <AdminResumo />
         {erro && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{erroAtrasos(erro)}</div>
